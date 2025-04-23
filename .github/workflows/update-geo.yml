@@ -19,18 +19,11 @@ jobs:
         with:
           python-version: '3.x'
 
-      # 克隆 v2ray-geosite 仓库
-      - name: Clone v2ray-geosite
-        run: |
-          git clone https://github.com/Loyalsoldier/v2ray-geosite.git
-          cp v2ray-geosite/v2ray-geosite.py rules/v2ray-geosite.py
-
-      # 下载最新的 geosite.dat 和 geoip.dat
-      - name: Download Geo Files
+      # 下载 v2ray-geosite.py
+      - name: Download v2ray-geosite
         run: |
           mkdir -p rules
-          wget https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geosite.dat -O rules/geosite.dat
-          wget https://cdn.jsdelivr.net/gh/Loyalsoldier/geoip@release/geoip.dat -O rules/geoip.dat
+          wget https://raw.githubusercontent.com/Loyalsoldier/v2ray-geosite/master/v2ray-geosite.py -O rules/v2ray-geosite.py
 
       # 运行导出脚本
       - name: Export Rules
