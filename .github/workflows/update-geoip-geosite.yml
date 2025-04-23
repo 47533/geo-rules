@@ -1,6 +1,5 @@
 name: 更新 MosDNS 的 GeoIP 和 GeoSite 规则
 
-# 触发条件：每天定时运行或手动触发
 on:
   schedule:
     - cron: '0 6 * * *' # 每天北京时间 14:00（UTC 6:00）
@@ -19,15 +18,19 @@ jobs:
       - name: 设置 Go 环境
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22' # sing-box 需要 Go 1.22 或更高版本
+          go-version: '1.21'
 
-      # 3. 安装 sing-box 的 sing-geoip 和 sing-geosite 工具
-      - name: 安装 sing-box 工具
+      # 3. 克隆 sing-tools 并构建特定版本
+      - name: 构建 sing-tools
         run: |
-          go install github.com/sagernet/sing-box/cmd/sing-geoip@latest
-          go install github.com/sagernet/sing-box/cmd/sing-geosite@latest
-          mv ~/go/bin/sing-geoip .
-          mv ~/go/bin/sing-geosite .
+          git clone https://github.com/sagernet/sing-tools.git
+          cd sing-tools
+          git checkout v0.1.3 # 使用支持 sing-geoip 和 sing-geosite 的版本
+          go build -o sing-geoip ./cmd/sing-geoip
+          go build -o sing-geosite ./cmd/sing-geosite
+          mv sing-geoip ../
+          mv sing-geosite ../
+          cd ..
           chmod +x sing-geoip sing-geosite
 
       # 4. 下载最新的 geoip.dat 和 geosite.dat
