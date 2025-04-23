@@ -1,5 +1,6 @@
 name: 更新 MosDNS 的 GeoIP 和 GeoSite 规则
 
+# 触发条件：每天定时运行或手动触发
 on:
   schedule:
     - cron: '0 6 * * *' # 每天北京时间 14:00（UTC 6:00）
@@ -18,14 +19,14 @@ jobs:
       - name: 设置 Go 环境
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21' # 使用 Go 1.21，兼容 sing-box v1.9.3
-          cache: true
+          go-version: '1.23' # 使用 Go 1.23，确保兼容 sing-box 和 quic-go
+          cache: true # 启用依赖缓存，加速构建
 
-      # 3. 安装 sing-box v1.9.3 的 sing-geoip 和 sing-geosite 工具
+      # 3. 安装 sing-box 的 sing-geoip 和 sing-geosite 工具
       - name: 安装 sing-box 工具
         run: |
-          go install github.com/sagernet/sing-box/cmd/sing-geoip@v1.9.3
-          go install github.com/sagernet/sing-box/cmd/sing-geosite@v1.9.3
+          go install github.com/sagernet/sing-box/cmd/sing-geoip@v1.10.0
+          go install github.com/sagernet/sing-box/cmd/sing-geosite@v1.10.0
           mv ~/go/bin/sing-geoip .
           mv ~/go/bin/sing-geosite .
           chmod +x sing-geoip sing-geosite
@@ -55,7 +56,7 @@ jobs:
           for file in rule/*.txt; do
             if [ ! -s "$file" ]; then
               echo "错误：$file 为空"
-              exit 1
+hoz              exit 1
             fi
           done
 
