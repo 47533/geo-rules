@@ -1,0 +1,58 @@
+name: Update GeoIP and GeoSite for MosDNS
+
+# 触发条件：每天定时运行或手动触发
+on:
+  schedule:
+    - cron: '0 6 * * *' # 每天北京时间14:00（UTC+8）运行，GitHub Actions使用UTC时间（6:00 UTC = 14:00 北京时间）
+  workflow_dispatch: # 支持手动触发
+
+jobs:
+  update-rules:
+    runs-on: ubuntu-latest # 使用Ubuntu最新环境
+
+    steps:
+      # 1. 检出仓库代码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. 设置Go环境（用于编译或运行v2dat）
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21' # v2dat需要Go环境，版本根据需要调整
+
+      # 3. 下载最新的geoip.dat和geosite.dat
+      - name: Download geoip.dat and geosite.dat
+        run: |
+          wget -O geoip.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
+          wget -O geosite.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
+
+      # 4. 下载v2dat工具
+      - name: Download v2dat
+        run: |
+          wget -O v2dat https://github.com/v2fly/v2ray-core/releases/latest/download/v2dat
+          chmod +x v2dat
+
+      # 5. 解压geoip.dat和geosite.dat为MosDNS规则文件
+      - name: Convert geoip.dat and geosite.dat
+        run: |
+          mkdir -p rule
+          ./v2dat unpack geoip -o rule -f cn geoip.dat # 提取geoip:cn
+          ./v2dat unpack geosite -o rule -f cn geosite.dat # 提取geosite:cn
+          ./v2dat unpack geosite -o rule -f 'geolocation-!cn' geosite.dat # 提取geosite:geolocation-!cn
+          ./v2dat unpack geosite -o rule -f 'category-ads-all' geosite.dat # 提取广告域名
+
+      # 6. 检查文件是否生成
+      - name: List generated files
+        run: ls -l rule/
+
+      # 7. 提交转换后的规则文件到仓库
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          git add rule/*
+          git diff-index --quiet HEAD || git commit -m "Update MosDNS rules from geoip.dat and geosite.dat"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
