@@ -20,18 +20,16 @@ jobs:
         with:
           go-version: '1.21'
 
-      # 3. 克隆 sing-tools 并构建特定版本
-      - name: 构建 sing-tools
+      # 3. 克隆 v2ray-core 并构建特定版本的 v2dat
+      - name: 构建 v2dat
         run: |
-          git clone https://github.com/sagernet/sing-tools.git
-          cd sing-tools
-          git checkout v0.1.3 # 使用支持 sing-geoip 和 sing-geosite 的版本
-          go build -o sing-geoip ./cmd/sing-geoip
-          go build -o sing-geosite ./cmd/sing-geosite
-          mv sing-geoip ../
-          mv sing-geosite ../
+          git clone https://github.com/v2fly/v2ray-core.git
+          cd v2ray-core
+          git checkout v4.45.2 # 使用支持 unpack 的版本
+          go build -o v2dat ./main
+          mv v2dat ../
           cd ..
-          chmod +x sing-geoip sing-geosite
+          chmod +x v2dat
 
       # 4. 下载最新的 geoip.dat 和 geosite.dat
       - name: 下载 geoip.dat 和 geosite.dat
@@ -43,10 +41,10 @@ jobs:
       - name: 转换 geoip.dat 和 geosite.dat
         run: |
           mkdir -p rule
-          ./sing-geoip -o rule/geoip_cn.txt cn geoip.dat # 提取 geoip:cn
-          ./sing-geosite -o rule/geosite_cn.txt cn geosite.dat # 提取 geosite:cn
-          ./sing-geosite -o rule/geosite_geolocation-!cn.txt geolocation-!cn geosite.dat # 提取 geosite:geolocation-!cn
-          ./sing-geosite -o rule/geosite_category-ads-all.txt category-ads-all geosite.dat # 提取广告域名
+          ./v2dat unpack geoip -o rule -f cn geoip.dat # 提取 geoip:cn
+          ./v2dat unpack geosite -o rule -f cn geosite.dat # 提取 geosite:cn
+          ./v2dat unpack geosite -o rule -f 'geolocation-!cn' geosite.dat # 提取 geosite:geolocation-!cn
+          ./v2dat unpack geosite -o rule -f 'category-ads-all' geosite.dat # 提取广告域名
 
       # 6. 检查生成的文件
       - name: 列出生成的文件
