@@ -23,7 +23,10 @@ jobs:
       - name: Download v2ray-geosite
         run: |
           mkdir -p rules
-          wget https://raw.githubusercontent.com/Loyalsoldier/v2ray-geosite/master/v2ray-geosite.py -O rules/v2ray-geosite.py
+          wget https://ghproxy.com/https://raw.githubusercontent.com/Loyalsoldier/v2ray-geosite/master/v2ray-geosite.py -O rules/v2ray-geosite.py || {
+            echo "错误：无法下载 v2ray-geosite.py"
+            exit 1
+          }
 
       # 运行导出脚本
       - name: Export Rules
