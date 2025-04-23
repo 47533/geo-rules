@@ -1,5 +1,6 @@
 name: 更新 MosDNS 的 GeoIP 和 GeoSite 规则
 
+# 触发条件：每天定时运行或手动触发
 on:
   schedule:
     - cron: '0 6 * * *' # 每天北京时间 14:00（UTC 6:00）
@@ -18,18 +19,16 @@ jobs:
       - name: 设置 Go 环境
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.21' # sing-box 工具需要 Go 1.21 或更高版本
 
-      # 3. 克隆 v2ray-core 并构建特定版本的 v2dat
-      - name: 构建 v2dat
+      # 3. 安装 sing-geoip 和 sing-geosite 工具
+      - name: 安装 sing-box 工具
         run: |
-          git clone https://github.com/v2fly/v2ray-core.git
-          cd v2ray-core
-          git checkout v4.45.2 # 使用支持 unpack 的版本
-          go build -o v2dat ./main
-          mv v2dat ../
-          cd ..
-          chmod +x v2dat
+          go install github.com/sagernet/sing-tools/cmd/sing-geoip@latest
+          go install github.com/sagernet/sing-tools/cmd/sing-geosite@latest
+          mv ~/go/bin/sing-geoip .
+          mv ~/go/bin/sing-geosite .
+          chmod +x sing-geoip sing-geosite
 
       # 4. 下载最新的 geoip.dat 和 geosite.dat
       - name: 下载 geoip.dat 和 geosite.dat
@@ -41,10 +40,10 @@ jobs:
       - name: 转换 geoip.dat 和 geosite.dat
         run: |
           mkdir -p rule
-          ./v2dat unpack geoip -o rule -f cn geoip.dat # 提取 geoip:cn
-          ./v2dat unpack geosite -o rule -f cn geosite.dat # 提取 geosite:cn
-          ./v2dat unpack geosite -o rule -f 'geolocation-!cn' geosite.dat # 提取 geosite:geolocation-!cn
-          ./v2dat unpack geosite -o rule -f 'category-ads-all' geosite.dat # 提取广告域名
+          ./sing-geoip -o rule/geoip_cn.txt cn geoip.dat # 提取 geoip:cn
+          ./sing-geosite -o rule/geosite_cn.txt cn geosite.dat # 提取 geosite:cn
+          ./sing-geosite -o rule/geosite_geolocation-!cn.txt geolocation-!cn geosite.dat # 提取 geosite:geolocation-!cn
+          ./sing-geosite -o rule/geosite_category-ads-all.txt category-ads-all geosite.dat # 提取广告域名
 
       # 6. 检查生成的文件
       - name: 列出生成的文件
