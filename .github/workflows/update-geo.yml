@@ -13,15 +13,25 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 设置 Python 环境
+      # 设置 Python 环境（用于 v2ray-geosite）
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
+      # 设置 Go 环境（用于 geoip2text）
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.x'
+
       # 安装 v2ray-geosite
       - name: Install v2ray-geosite
         run: pip install v2ray-geosite
+
+      # 安装 geoip2text
+      - name: Install geoip2text
+        run: go install github.com/antonmedv/geoip2text@latest
 
       # 下载最新的 geosite.dat 和 geoip.dat
       - name: Download Geo Files
