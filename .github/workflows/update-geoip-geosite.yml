@@ -3,35 +3,39 @@ name: Update GeoIP and GeoSite for MosDNS
 # 触发条件：每天定时运行或手动触发
 on:
   schedule:
-    - cron: '0 6 * * *' # 每天北京时间14:00（UTC+8）运行，GitHub Actions使用UTC时间（6:00 UTC = 14:00 北京时间）
-  workflow_dispatch: # 支持手动触发
+    - cron: '0 6 * * *' # 每天北京时间14:00（UTC 6:00）
+  workflow_dispatch:
 
 jobs:
   update-rules:
-    runs-on: ubuntu-latest # 使用Ubuntu最新环境
+    runs-on: ubuntu-latest
 
     steps:
       # 1. 检出仓库代码
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. 设置Go环境（用于编译或运行v2dat）
+      # 2. 设置Go环境
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21' # v2dat需要Go环境，版本根据需要调整
+          go-version: '1.21' # v2ray-core需要Go 1.21或更高版本
 
-      # 3. 下载最新的geoip.dat和geosite.dat
+      # 3. 克隆v2ray-core并构建v2dat
+      - name: Build v2dat
+        run: |
+          git clone https://github.com/v2fly/v2ray-core.git
+          cd v2ray-core
+          go build -o v2dat ./main
+          mv v2dat ../
+          cd ..
+          chmod +x v2dat
+
+      # 4. 下载最新的geoip.dat和geosite.dat
       - name: Download geoip.dat and geosite.dat
         run: |
           wget -O geoip.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
           wget -O geosite.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
-
-      # 4. 下载v2dat工具
-      - name: Download v2dat
-        run: |
-          wget -O v2dat https://github.com/v2fly/v2ray-core/releases/latest/download/v2dat
-          chmod +x v2dat
 
       # 5. 解压geoip.dat和geosite.dat为MosDNS规则文件
       - name: Convert geoip.dat and geosite.dat
@@ -46,7 +50,17 @@ jobs:
       - name: List generated files
         run: ls -l rule/
 
-      # 7. 提交转换后的规则文件到仓库
+      # 7. 验证生成的文件
+      - name: Verify generated files
+        run: |
+          for file in rule/*.txt; do
+            if [ ! -s "$file" ]; then
+              echo "Error: $file is empty"
+              exit 1
+            fi
+          done
+
+      # 8. 提交转换后的规则文件到仓库
       - name: Commit and push changes
         run: |
           git config --global user.name "GitHub Action"
