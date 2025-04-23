@@ -4,13 +4,13 @@
 cd rules
 
 # 导出 geosite 的 cn 分类（国内域名）
-sing-box rule-set convert --type geosite --output geosite_cn.txt geosite.dat cn
+v2ray-geosite --dat geosite.dat --category cn > geosite_cn.txt
 
 # 导出 geosite 的非 cn 分类（国外域名）
-sing-box rule-set convert --type geosite --output geosite_non_cn.txt geosite.dat geolocation-!cn
+v2ray-geosite --dat geosite.dat --category geolocation-!cn > geosite_non_cn.txt
 
-# 导出 geoip 的 cn 分类（国内 IP）
-sing-box rule-set convert --type geoip --output geoip_cn.txt geoip.dat cn
+# 直接复制 geoip_cn.txt（v2ray-geosite 不支持 geoip，暂时使用完整 geoip.dat）
+cp geoip.dat geoip_cn.txt
 
-# 清理临时文件（可选，保留 dat 文件便于调试）
+# （可选）清理临时文件
 # rm -f geosite.dat geoip.dat
