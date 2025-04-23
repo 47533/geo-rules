@@ -1,0 +1,156 @@
+log:
+  level: info
+  file: "/var/log/mosdns.log" # 日志文件路径
+
+data_providers:
+  - tag: chinalist
+    file: "/etc/mosdns/rule/china_domain_list.txt" # 国内域名列表
+    auto_reload: true
+  - tag: rejectlist
+    file: "/etc/mosdns/rule/reject-list.txt" # 广告/屏蔽域名列表
+    auto_reload: true
+  - tag: geosite_cn
+    file: "/etc/mosdns/rule/geosite_cn.txt" # 从 geosite.dat 导出的国内域名
+    auto_reload: true
+  - tag: geosite_non_cn
+    file: "/etc/mosdns/rule/geosite_geolocation-!cn.txt" # 国外域名
+    auto_reload: true
+  - tag: geoip_cn
+    file: "/etc/mosdns/rule/geoip_cn.txt" # 国内 IP 列表
+    auto_reload: true
+
+plugins:
+  # 缓存插件，减少重复查询
+  - tag: cache
+    type: cache
+    args:
+      size: 10240 # 缓存大小
+      lazy_cache_ttl: 86400 # 延迟缓存时间（秒）
+      compress_resp: true # 压缩响应
+      cache_everything: true # 缓存所有记录
+
+  # 本地 DNS 转发（国内流量）
+  - tag: forward_local
+    type: forward
+    args:
+      concurrent: 2 # 并发查询
+      upstreams:
+        - addr: "119.29.29.29" # 腾讯公共 DNS
+        - addr: "223.5.5.5" # 阿里公共 DNS
+
+  # 国外 DNS 转发（通过 Mihomo）
+  - tag: forward_remote
+    type: forward
+    args:
+      concurrent: 2
+      upstreams:
+        - addr: "127.0.0.1:1053" # Mihomo 的 DNS 监听端口
+
+  # 自定义 hosts 文件
+  - tag: hosts
+    type: hosts
+    args:
+      files:
+        - "/etc/mosdns/hosts" # 自定义 hosts 文件路径
+
+  # 国内 IP 集合，用于判断解析结果
+  - tag: local_ip
+    type: ip_set
+    args:
+      files:
+        - "/etc/mosdns/rule/geoip_cn.txt" # 国内 IP 列表
+        - "/etc/mosdns/rule/private_ip.txt" # 内网 IP（如 192.168.0.0/16）
+
+  # 处理本地和 CDN 域名
+  - tag: query_is_local_domain
+    type: query_matcher
+    args:
+      domain:
+        - "provider:chinalist" # 国内域名列表
+        - "provider:geosite_cn" # geosite 国内域名
+
+  # 处理国外域名
+  - tag: query_is_non_local_domain
+    type: query_matcher
+    args:
+      domain:
+        - "provider:geosite_non_cn" # 国外域名
+
+  # 屏蔽广告域名
+  - tag: query_is_ad_domain
+    type: query_matcher
+    args:
+      domain:
+        - "provider:rejectlist" # 广告域名列表
+
+  # 优先使用 IPv4
+  - tag: prefer_ipv4
+    type: sequence
+    args:
+      exec:
+        - _prefer_ipv4
+
+  # 本地 DNS 序列
+  - tag: local_sequence
+    type: sequence
+    args:
+      - exec: $forward_local # 使用本地 DNS 解析
+      - matches: resp_ip $local_ip # 如果返回国内 IP，直接接受
+        exec: accept
+      - exec: drop_resp # 否则丢弃响应
+
+  # 国外 DNS 序列
+  - tag: remote_sequence
+    type: sequence
+    args:
+      - exec: $forward_remote # 使用 Mihomo DNS 解析
+      - matches: "!resp_ip $local_ip" # 如果返回非国内 IP，转发到 Mihomo
+        exec: accept
+      - exec: accept # 接受其他响应
+
+  # Fallback 序列（处理未知域名）
+  - tag: fallback
+    type: fallback
+    args:
+      primary: local_sequence # 优先本地 DNS
+      secondary: remote_sequence # 次选 Mihomo DNS
+      threshold: 500 # 本地 DNS 超时阈值（毫秒）
+      always_standby: true # 始终保持次选 DNS 待命
+
+  # 主执行序列
+  - tag: main_sequence
+    type: sequence
+    args:
+      - exec: $hosts # 检查 hosts 文件
+      - matches: has_resp
+        exec: accept # 如果有响应，直接接受
+      - matches: qtype 12 65 # 屏蔽 PTR 和 DNSSEC 请求
+        exec: reject 0
+      - matches: $query_is_ad_domain # 屏蔽广告域名
+        exec: black_hole 127.0.0.1
+      - exec: $cache # 应用缓存
+      - matches: has_resp
+        exec: accept
+      - matches: $query_is_local_domain # 国内域名
+        exec: $forward_local
+      - matches: has_resp
+        exec: accept
+      - matches: $query_is_non_local_domain # 国外域名
+        exec: $forward_remote
+      - matches: has_resp
+        exec: accept
+      - exec: $fallback # 未知域名走 fallback
+
+  # UDP 监听服务
+  - tag: udp_server
+    type: udp_server
+    args:
+      entry: main_sequence
+      listen: ":53" # 监听 DNS 端口
+
+  # TCP 监听服务
+  - tag: tcp_server
+    type: tcp_server
+    args:
+      entry: main_sequence
+      listen: ":53"
