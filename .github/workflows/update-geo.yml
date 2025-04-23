@@ -1,0 +1,42 @@
+name: Update GeoIP and GeoSite
+
+on:
+  schedule:
+    - cron: '10 0 * * *' # 每天 UTC 00:10 运行（北京时间 08:10）
+  workflow_dispatch: # 支持手动触发
+
+jobs:
+  update-geo:
+    runs-on: ubuntu-latest
+    steps:
+      # 检出仓库代码
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 安装 sing-box 用于导出规则
+      - name: Install sing-box
+        run: |
+          SING_BOX_VERSION=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | grep tag_name | cut -d '"' -f 4 | sed 's/v//')
+          wget https://github.com/SagerNet/sing-box/releases/download/v${SING_BOX_VERSION}/sing-box_${SING_BOX_VERSION}_linux_amd64.deb
+          sudo dpkg -i sing-box_${SING_BOX_VERSION}_linux_amd64.deb
+          rm sing-box_${SING_BOX_VERSION}_linux_amd64.deb
+
+      # 下载最新的 geosite.dat 和 geoip.dat
+      - name: Download Geo Files
+        run: |
+          mkdir -p rules
+          wget https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geosite.dat -O rules/geosite.dat
+          wget https://cdn.jsdelivr.net/gh/Loyalsoldier/geoip@release/geoip.dat -O rules/geoip.dat
+
+      # 运行导出脚本
+      - name: Export Rules
+        run: bash scripts/update-geo.sh
+
+      # 提交更改到仓库
+      - name: Commit and Push Changes
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add rules/
+          git commit -m "Update GeoIP and GeoSite rules: $(date -u)" || exit 0
+          git push
